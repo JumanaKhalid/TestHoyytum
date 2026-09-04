@@ -1,46 +1,333 @@
 <!DOCTYPE html>
-<html lang="ar" dir="ltr">
+<html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Saudi Greetings Chatbot</title>
     
-    <!-- تحميل مكتبة Tailwind CSS للتصميم -->
+    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- تحميل مترجم Babel لقراءة أكواد React داخل المتصفح -->
+    <!-- React & ReactDOM (UMD versions for direct browser usage) -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    
+    <!-- Babel for compiling JSX in the browser -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Google Fonts for better Arabic typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Tajawal', sans-serif; }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
 </head>
-<body class="bg-gray-100">
-    <!-- هنا سيتم رسم التطبيق -->
-    <div id="root"></div>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-2 sm:p-4">
+    <!-- Root element where React will render the App -->
+    <div id="root" class="w-full max-w-md h-[90vh] sm:h-[85vh] max-h-[800px]"></div>
 
-    <!-- كود التشغيل -->
-    <script type="text/babel" data-type="module">
-        // 1. استيراد مكتبات React والأيقونات عبر روابط خارجية مخصصة للمتصفح
-        import React, { useState, useEffect, useRef } from 'https://esm.sh/react@18';
-        import { createRoot } from 'https://esm.sh/react-dom@18/client';
-        import { Volume2, Mic, Edit3, Send, ChevronRight, CheckCircle2, XCircle, Loader2 } from 'https://esm.sh/lucide-react@0.292.0';
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
 
-        // ==========================================
-        // 2. الصق كود التشات بوت الخاص بك هنا
-        // ابدأ النسخ من السطر: const GREETINGS = [ ...
-        // وحتى نهاية الدالة (إغلاق قوس App)
-        // (لا تنسخ أسطر الـ import القديمة)
-        // ==========================================
+        /* --- SVG Icons Setup (Replaces external libraries to guarantee it works) --- */
+        const IconMic = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>;
+        const IconVolume = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>;
+        const IconEdit = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>;
+        const IconSend = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>;
+        const IconCheck = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>;
 
-        // --- ضع كودك هنا ---
+        const GREETINGS = [
+            { id: 1, arabic: 'السلام عليكم', transliteration: 'As-salamu alaykum', meaning: 'Peace be upon you (Standard polite greeting)', hint: 'Used anytime, anywhere. The most common greeting.' },
+            { id: 2, arabic: 'يا هلا', transliteration: 'Ya Hala', meaning: 'A warm welcome', hint: 'Very common, casual and warm greeting.' },
+            { id: 3, arabic: 'حياك الله', transliteration: 'Hayyak Allah', meaning: 'May God greet you / Welcome', hint: 'A traditional Saudi way to welcome guests warmly.' },
+            { id: 4, arabic: 'كيف الحال', transliteration: 'Kayf al-hal', meaning: 'How are you?', hint: 'Usually said right after the initial greeting.' }
+        ];
 
+        // Function to clean Arabic text for accurate comparison (removes diacritics, unifies Alef and Taa Marbouta)
+        const normalizeArabic = (text) => {
+            if (!text) return text;
+            return text
+                .replace(/[\u0617-\u061A\u064B-\u0652]/g, "") // Remove Tashkeel
+                .replace(/[أإآ]/g, "ا") // Unify Alef
+                .replace(/ة/g, "ه") // Unify Taa Marbouta with Haa
+                .replace(/[\.,!؟]/g, "") // Remove punctuation
+                .trim();
+        };
 
+        const App = () => {
+            const [messages, setMessages] = useState([]);
+            const [currentGreetingIndex, setCurrentGreetingIndex] = useState(0);
+            const [inputMode, setInputMode] = useState('none'); // 'none', 'writing'
+            const [inputText, setInputText] = useState("");
+            const [isRecording, setIsRecording] = useState(false);
+            const [speechSupported, setSpeechSupported] = useState(true);
+            
+            const messagesEndRef = useRef(null);
+            const recognitionRef = useRef(null);
 
+            const currentGreeting = GREETINGS[currentGreetingIndex];
 
-        
-        
-        // ==========================================
-        // 3. تشغيل التطبيق (لا تحذف هذا الجزء)
-        // ==========================================
-        const root = createRoot(document.getElementById('root'));
-        // ملاحظة: إذا كان اسم الدالة الرئيسية لديك هو App، اترك السطر التالي كما هو
+            // Auto-scroll to bottom of chat
+            const scrollToBottom = () => {
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            };
+
+            useEffect(() => {
+                scrollToBottom();
+            }, [messages, inputMode, isRecording]);
+
+            useEffect(() => {
+                // Initialize Speech Recognition API
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                
+                if (SpeechRecognition) {
+                    const recognition = new SpeechRecognition();
+                    recognition.continuous = false;
+                    recognition.lang = 'ar-SA'; // Set to Saudi Arabic
+                    recognition.interimResults = false;
+                    
+                    recognition.onresult = (event) => {
+                        const transcript = event.results[0][0].transcript;
+                        handleSpeechResult(transcript);
+                    };
+                    
+                    recognition.onerror = (event) => {
+                        console.error("Speech recognition error", event.error);
+                        setIsRecording(false);
+                        if (event.error === 'not-allowed') {
+                            addMessage('bot', 'Microphone access was denied. Please allow microphone permissions in your browser.', 'error');
+                        } else if (event.error === 'no-speech') {
+                            addMessage('bot', 'I did not hear any speech. Please try again.', 'error');
+                        } else {
+                            addMessage('bot', `Oops, speech recognition failed (Error: ${event.error}).`, 'error');
+                        }
+                    };
+                    
+                    recognition.onend = () => {
+                        setIsRecording(false);
+                    };
+                    
+                    recognitionRef.current = recognition;
+                } else {
+                    setSpeechSupported(false);
+                }
+
+                // Initial Welcome Message
+                setTimeout(() => {
+                    addMessage('bot', 'Welcome to Saudi Arabia! 🇸🇦\nI am your personal guide to learning Saudi greetings. Ready to learn how to greet locals like a pro?');
+                    addInteractiveElement('startBtn');
+                }, 500);
+            }, []);
+
+            const addMessage = (sender, text, type = 'text') => {
+                setMessages(prev => [...prev, { id: Date.now() + Math.random(), sender, text, type }]);
+            };
+
+            const addInteractiveElement = (type, data = null) => {
+                setMessages(prev => [...prev, { id: Date.now() + Math.random(), sender: 'bot', type: 'interactive', subType: type, data }]);
+            };
+
+            const startLesson = (index) => {
+                if (index >= GREETINGS.length) {
+                    addMessage('bot', 'Amazing! 🎉 You have learned all the essential Saudi greetings. You are now ready to make great connections in Saudi Arabia!');
+                    return;
+                }
+                setCurrentGreetingIndex(index);
+                const greeting = GREETINGS[index];
+                addMessage('bot', `Let's learn greeting #${index + 1}:`);
+                addInteractiveElement('lessonCard', greeting);
+            };
+
+            const handleListen = (text) => {
+                if ('speechSynthesis' in window) {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'ar-SA';
+                    utterance.rate = 0.85; // Slow down slightly for learners
+                    window.speechSynthesis.speak(utterance);
+                    addMessage('user', `🔊 *Listening to pronunciation*`);
+                } else {
+                    addMessage('bot', 'Sorry, your browser does not support text-to-speech.', 'error');
+                }
+            };
+
+            const startSpeaking = () => {
+                if (!speechSupported || !recognitionRef.current) {
+                    addMessage('bot', 'Sorry, your browser does not support voice recognition. Try using Google Chrome.', 'error');
+                    return;
+                }
+                
+                const requestMic = async () => {
+                    try {
+                        // Explicitly request microphone access first
+                        await navigator.mediaDevices.getUserMedia({ audio: true });
+                        setIsRecording(true);
+                        addMessage('user', '🎤 *Listening to your voice...*');
+                        recognitionRef.current.start();
+                    } catch (e) {
+                        console.error("Microphone access error:", e);
+                        setIsRecording(false);
+                        addMessage('bot', 'Could not access the microphone. Please check your browser permissions.', 'error');
+                    }
+                };
+                
+                requestMic();
+            };
+
+            const handleSpeechResult = (transcript) => {
+                addMessage('user', `🎤 I said: "${transcript}"`);
+                checkAnswer(transcript, 'speech');
+            };
+
+            const startWriting = () => {
+                setInputMode('writing');
+                addMessage('bot', `Please type exactly: "${currentGreeting.arabic}" (Use an Arabic keyboard)`);
+            };
+
+            const handleTextSubmit = (e) => {
+                e.preventDefault();
+                if (!inputText.trim()) return;
+                
+                const userText = inputText;
+                addMessage('user', `✍️ ${userText}`);
+                setInputText("");
+                setInputMode('none');
+                checkAnswer(userText, 'writing');
+            };
+
+            const checkAnswer = (userInput, mode) => {
+                const target = currentGreeting.arabic;
+                const normalizedInput = normalizeArabic(userInput);
+                const normalizedTarget = normalizeArabic(target);
+
+                if (normalizedInput === normalizedTarget || normalizedInput.includes(normalizedTarget)) {
+                    addMessage('bot', 'Excellent! 🎉 You got it right.', 'success');
+                    addInteractiveElement('nextBtn');
+                } else {
+                    const hintMsg = mode === 'speech' 
+                        ? 'Almost there! You said "' + userInput + '". Listen closely again and try to mimic the sounds.'
+                        : 'Not quite. Remember to use Arabic letters. Let\'s try again!';
+                    
+                    addMessage('bot', hintMsg, 'error');
+                    // Add the lesson card again so they can try again easily
+                    addInteractiveElement('lessonCard', currentGreeting);
+                }
+            };
+
+            const renderMessage = (msg) => {
+                if (msg.type === 'text' || msg.type === 'error' || msg.type === 'success') {
+                    const isBot = msg.sender === 'bot';
+                    let bgColor = isBot ? 'bg-white' : 'bg-green-600';
+                    let textColor = isBot ? 'text-gray-800' : 'text-white';
+                    let align = isBot ? 'self-start rounded-tr-xl rounded-br-xl rounded-bl-sm' : 'self-end rounded-tl-xl rounded-bl-xl rounded-br-sm';
+                    
+                    if (msg.type === 'error') bgColor = 'bg-red-50 border border-red-200';
+                    if (msg.type === 'success') bgColor = 'bg-green-50 border border-green-200';
+
+                    return (
+                        <div key={msg.id} className={`max-w-[85%] p-3 shadow-sm fade-in rounded-tl-xl ${align} ${bgColor} ${textColor}`}>
+                            <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                        </div>
+                    );
+                }
+
+                if (msg.type === 'interactive') {
+                    if (msg.subType === 'startBtn') {
+                        return (
+                            <button key={msg.id} onClick={() => startLesson(0)} 
+                                className="self-center mt-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-bold shadow-lg transition transform hover:scale-105 fade-in flex items-center gap-2">
+                                Start Learning! <IconSend />
+                            </button>
+                        );
+                    }
+                    
+                    if (msg.subType === 'nextBtn') {
+                        return (
+                            <button key={msg.id} onClick={() => startLesson(currentGreetingIndex + 1)} 
+                                className="self-center mt-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full font-bold shadow-lg transition transform hover:scale-105 fade-in flex items-center gap-2">
+                                Next Greeting <IconCheck />
+                            </button>
+                        );
+                    }
+
+                    if (msg.subType === 'lessonCard') {
+                        const item = msg.data;
+                        return (
+                            <div key={msg.id} className="self-center w-full max-w-[95%] bg-white border-2 border-green-100 rounded-2xl p-4 shadow-md fade-in flex flex-col gap-3">
+                                <div className="text-center">
+                                    <h3 className="text-3xl font-bold text-green-700 mb-1" dir="rtl">{item.arabic}</h3>
+                                    <p className="text-gray-500 italic text-sm">{item.transliteration}</p>
+                                    <p className="font-semibold text-gray-800 mt-2">{item.meaning}</p>
+                                    <p className="text-xs text-gray-500 mt-1 bg-gray-50 p-2 rounded">{item.hint}</p>
+                                </div>
+                                
+                                <div className="grid grid-cols-3 gap-2 mt-2">
+                                    <button onClick={() => handleListen(item.arabic)} className="flex flex-col items-center justify-center bg-blue-50 hover:bg-blue-100 text-blue-700 p-2 rounded-xl transition">
+                                        <IconVolume />
+                                        <span className="text-xs font-bold mt-1">Listen</span>
+                                    </button>
+                                    <button onClick={startSpeaking} disabled={isRecording} className={`flex flex-col items-center justify-center p-2 rounded-xl transition ${isRecording ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-green-50 hover:bg-green-100 text-green-700'}`}>
+                                        <IconMic />
+                                        <span className="text-xs font-bold mt-1">{isRecording ? 'Listening...' : 'Speak'}</span>
+                                    </button>
+                                    <button onClick={startWriting} className="flex flex-col items-center justify-center bg-purple-50 hover:bg-purple-100 text-purple-700 p-2 rounded-xl transition">
+                                        <IconEdit />
+                                        <span className="text-xs font-bold mt-1">Write</span>
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    }
+                }
+                return null;
+            };
+
+            return (
+                <div className="w-full h-full bg-[#f3f4f6] flex flex-col rounded-3xl shadow-2xl overflow-hidden border border-gray-200">
+                    {/* Header */}
+                    <div className="bg-green-700 text-white p-4 flex items-center gap-3 shadow-md z-10">
+                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-xl shadow-inner">
+                            🇸🇦
+                        </div>
+                        <div>
+                            <h1 className="font-bold text-lg leading-tight">Saudi Guide</h1>
+                            <p className="text-green-200 text-xs">Learn Greetings</p>
+                        </div>
+                    </div>
+
+                    {/* Chat Area */}
+                    <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-[url('https://www.transparenttextures.com/patterns/arabesque.png')] bg-opacity-10">
+                        {messages.map(renderMessage)}
+                        <div ref={messagesEndRef} />
+                    </div>
+
+                    {/* Input Area (Only visible when writing mode is active) */}
+                    {inputMode === 'writing' && (
+                        <div className="p-3 bg-white border-t border-gray-200 fade-in">
+                            <form onSubmit={handleTextSubmit} className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    value={inputText}
+                                    onChange={(e) => setInputText(e.target.value)}
+                                    placeholder="اكتب التحية هنا..." 
+                                    dir="rtl"
+                                    className="flex-1 border-2 border-gray-200 rounded-full px-4 py-2 focus:outline-none focus:border-green-500 font-bold"
+                                    autoFocus
+                                />
+                                <button type="submit" className="bg-green-600 hover:bg-green-700 text-white w-12 h-12 rounded-full flex items-center justify-center shadow-md transition">
+                                    <IconSend />
+                                </button>
+                            </form>
+                            <button onClick={() => setInputMode('none')} className="w-full text-center text-xs text-gray-400 mt-2 hover:text-gray-600">
+                                Cancel writing
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
 </body>
