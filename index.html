@@ -1,358 +1,47 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Volume2, Mic, Edit3, Send, ChevronRight, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
-
-// القاموس المصغر للتحايا السعودية
-const GREETINGS = [
-  { 
-    id: 1,
-    arabic: 'السلام عليكم', 
-    transliteration: 'As-salamu alaykum', 
-    meaning: 'Peace be upon you (Standard polite greeting)',
-    hint: 'Used anytime, anywhere. The most common greeting.'
-  },
-  { 
-    id: 2,
-    arabic: 'يا هلا', 
-    transliteration: 'Ya Hala', 
-    meaning: 'A warm welcome',
-    hint: 'Very common, casual and warm greeting.'
-  },
-  { 
-    id: 3,
-    arabic: 'حياك الله', 
-    transliteration: 'Hayyak Allah', 
-    meaning: 'May God greet you / Welcome',
-    hint: 'A traditional Saudi way to welcome guests warmly.'
-  },
-  { 
-    id: 4,
-    arabic: 'كيف الحال', 
-    transliteration: 'Kayf al-hal', 
-    meaning: 'How are you?',
-    hint: 'Usually said right after the initial greeting.'
-  }
-];
-
-// دالة لتنظيف النص العربي من التشكيل والمسافات الزائدة للمقارنة الدقيقة
-const normalizeArabic = (text) => {
-  if (!text) return "";
-  return text
-    .replace(/[\u0617-\u061A\u064B-\u0652]/g, "") // إزالة التشكيل
-    .replace(/[أإآ]/g, "ا") // توحيد الألف
-    .replace(/ة/g, "ه") // توحيد التاء المربوطة والهاء
-    .replace(/ـ/g, "") // إزالة التطويل
-    .replace(/[؟.,!]/g, "") // إزالة علامات الترقيم
-    .trim();
-};
-
-export default function App() {
-  const [messages, setMessages] = useState([]);
-  const [currentGreetingIndex, setCurrentGreetingIndex] = useState(0);
-  const [inputMode, setInputMode] = useState('none'); // 'none', 'writing'
-  const [inputText, setInputText] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(true);
-  
-  const messagesEndRef = useRef(null);
-  const recognitionRef = useRef(null);
-
-  const currentGreeting = GREETINGS[currentGreetingIndex];
-
-  // التمرير التلقائي لأسفل المحادثة
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, inputMode, isRecording]);
-
-  useEffect(() => {
-    // إعداد واجهة التعرف على الصوت
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.lang = 'ar-SA'; // تعيين اللغة للغة العربية (السعودية)
-      recognition.interimResults = false;
-      
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        handleSpeechResult(transcript);
-      };
-      
-      recognition.onerror = (event) => {
-        console.error("Speech recognition error", event.error);
-        setIsRecording(false);
-        if (event.error === 'not-allowed') {
-          addMessage('bot', 'Microphone access was denied. Please allow microphone permissions in your browser.', 'error');
-        } else if (event.error === 'no-speech') {
-          addMessage('bot', 'I did not hear any speech. Please try again.', 'error');
-        } else {
-          addMessage('bot', `Oops, speech recognition failed (Error: ${event.error}).`, 'error');
-        }
-      };
-      
-      recognition.onend = () => {
-        setIsRecording(false);
-      };
-      
-      recognitionRef.current = recognition;
-    } else {
-      setSpeechSupported(false);
-    }
-
-    // رسالة الترحيب الأولى
-    setTimeout(() => {
-      addMessage('bot', 'مرحباً! Welcome to Saudi Arabia! 🇸🇦\nI am your personal guide to learning Saudi greetings. Ready to learn how to greet locals like a pro?');
-      addInteractiveElement('startBtn');
-    }, 500);
-  }, []);
-
-  const addMessage = (sender, text, type = 'text') => {
-    setMessages(prev => [...prev, { id: Date.now() + Math.random(), sender, text, type }]);
-  };
-
-  const addInteractiveElement = (type, data = null) => {
-    setMessages(prev => [...prev, { id: Date.now() + Math.random(), sender: 'bot', type: 'interactive', subType: type, data }]);
-  };
-
-  const startLesson = (index) => {
-    if (index >= GREETINGS.length) {
-      addMessage('bot', 'Amazing! 🎉 You have learned all the essential Saudi greetings. You are now ready to make great connections in Saudi Arabia!');
-      return;
-    }
+<!DOCTYPE html>
+<html lang="ar" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saudi Greetings Chatbot</title>
     
-    setCurrentGreetingIndex(index);
-    const greeting = GREETINGS[index];
+    <!-- تحميل مكتبة Tailwind CSS للتصميم -->
+    <script src="https://cdn.tailwindcss.com"></script>
     
-    addMessage('bot', `Let's learn greeting #${index + 1}:`);
-    addInteractiveElement('lessonCard', greeting);
-  };
+    <!-- تحميل مترجم Babel لقراءة أكواد React داخل المتصفح -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-gray-100">
+    <!-- هنا سيتم رسم التطبيق -->
+    <div id="root"></div>
 
-  const handleListen = (text) => {
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'ar-SA';
-      utterance.rate = 0.85; // إبطاء الصوت قليلاً ليكون أوضح للمتعلم
-      window.speechSynthesis.speak(utterance);
-      addMessage('user', `🔊 *Listening to pronunciation*`);
-    } else {
-      addMessage('bot', 'Sorry, your browser does not support text-to-speech.', 'error');
-    }
-  };
+    <!-- كود التشغيل -->
+    <script type="text/babel" data-type="module">
+        // 1. استيراد مكتبات React والأيقونات عبر روابط خارجية مخصصة للمتصفح
+        import React, { useState, useEffect, useRef } from 'https://esm.sh/react@18';
+        import { createRoot } from 'https://esm.sh/react-dom@18/client';
+        import { Volume2, Mic, Edit3, Send, ChevronRight, CheckCircle2, XCircle, Loader2 } from 'https://esm.sh/lucide-react@0.292.0';
 
-  const startSpeaking = () => {
-    if (!speechSupported || !recognitionRef.current) {
-      addMessage('bot', 'Sorry, your browser does not support voice recognition. Try using Google Chrome.', 'error');
-      return;
-    }
-    
-    const requestMic = async () => {
-      try {
-        // طلب صلاحية الميكروفون بشكل صريح أولاً
-        await navigator.mediaDevices.getUserMedia({ audio: true });
-        setIsRecording(true);
-        addMessage('user', '🎤 *Listening to your voice...*');
-        recognitionRef.current.start();
-      } catch (e) {
-        console.error("Microphone access error:", e);
-        setIsRecording(false);
-        addMessage('bot', 'Could not access the microphone. Please check your browser permissions or ensure you have a microphone connected.', 'error');
-      }
-    };
-    
-    requestMic();
-  };
+        // ==========================================
+        // 2. الصق كود التشات بوت الخاص بك هنا
+        // ابدأ النسخ من السطر: const GREETINGS = [ ...
+        // وحتى نهاية الدالة (إغلاق قوس App)
+        // (لا تنسخ أسطر الـ import القديمة)
+        // ==========================================
 
-  const handleSpeechResult = (transcript) => {
-    addMessage('user', `🎤 I said: "${transcript}"`);
-    checkAnswer(transcript, 'speech');
-  };
+        // --- ضع كودك هنا ---
 
-  const startWriting = () => {
-    setInputMode('writing');
-    addMessage('bot', `Please type exactly: "${currentGreeting.arabic}" (Use an Arabic keyboard)`);
-  };
 
-  const handleTextSubmit = (e) => {
-    e.preventDefault();
-    if (!inputText.trim()) return;
-    
-    const userText = inputText;
-    addMessage('user', `⌨️ ${userText}`);
-    setInputText('');
-    setInputMode('none');
-    
-    checkAnswer(userText, 'writing');
-  };
 
-  const checkAnswer = (userInput, mode) => {
-    const target = currentGreeting.arabic;
-    const normalizedInput = normalizeArabic(userInput);
-    const normalizedTarget = normalizeArabic(target);
-    
-    if (normalizedInput === normalizedTarget || normalizedInput.includes(normalizedTarget)) {
-      addMessage('bot', `Excellent! 🎉 You got it right.`, 'success');
-      addInteractiveElement('nextBtn');
-    } else {
-      const hintMsg = mode === 'speech' 
-        ? `Almost there! You said "${userInput}".\nListen closely again and try to mimic the sounds.`
-        : `Not quite. Remember, it's written as:\n"${target}"`;
-      addMessage('bot', hintMsg, 'error');
-    }
-  };
 
-  const renderMessage = (msg) => {
-    if (msg.type === 'interactive') {
-      if (msg.subType === 'startBtn') {
-        return (
-          <div key={msg.id} className="flex justify-center my-4">
-            <button 
-              onClick={() => {
-                setMessages(prev => prev.filter(m => m.subType !== 'startBtn'));
-                addMessage('user', 'Start Learning! 🚀');
-                startLesson(0);
-              }}
-              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-bold shadow-lg transition transform hover:scale-105"
-            >
-              Start Learning!
-            </button>
-          </div>
-        );
-      }
-      
-      if (msg.subType === 'lessonCard') {
-        const item = msg.data;
-        return (
-          <div key={msg.id} className="my-4 bg-white border-2 border-green-100 rounded-2xl p-5 shadow-sm w-full max-w-sm self-start">
-            <div className="text-center mb-4">
-              <h2 dir="rtl" className="text-4xl font-bold text-green-800 mb-2 font-arabic">{item.arabic}</h2>
-              <p className="text-lg font-semibold text-gray-700 mb-1">{item.transliteration}</p>
-              <p className="text-sm text-gray-500 italic">"{item.meaning}"</p>
-            </div>
-            
-            <div className="bg-yellow-50 text-yellow-800 text-xs p-3 rounded-xl mb-4 border border-yellow-200">
-              💡 <strong>Hint:</strong> {item.hint}
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <button onClick={() => handleListen(item.arabic)} className="flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 p-3 rounded-xl transition font-medium">
-                <Volume2 size={20} /> Listen to Pronunciation
-              </button>
-              
-              <button onClick={startSpeaking} disabled={isRecording} className={`flex items-center justify-center gap-2 p-3 rounded-xl transition font-medium ${isRecording ? 'bg-red-50 text-red-600 animate-pulse' : 'bg-green-50 hover:bg-green-100 text-green-700'}`}>
-                {isRecording ? <Loader2 size={20} className="animate-spin" /> : <Mic size={20} />}
-                {isRecording ? 'Listening...' : 'Practice Speaking'}
-              </button>
-              
-              <button onClick={startWriting} className="flex items-center justify-center gap-2 bg-purple-50 hover:bg-purple-100 text-purple-700 p-3 rounded-xl transition font-medium">
-                <Edit3 size={20} /> Practice Writing
-              </button>
-            </div>
-          </div>
-        );
-      }
-
-      if (msg.subType === 'nextBtn') {
-        return (
-          <div key={msg.id} className="flex justify-center my-4">
-            <button 
-              onClick={() => {
-                setMessages(prev => prev.filter(m => m.subType !== 'nextBtn'));
-                startLesson(currentGreetingIndex + 1);
-              }}
-              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-900 text-white px-5 py-2 rounded-full font-bold shadow transition"
-            >
-              Next Greeting <ChevronRight size={18} />
-            </button>
-          </div>
-        );
-      }
-    }
-
-    // Default Text Messages
-    const isBot = msg.sender === 'bot';
-    let bubbleStyle = isBot ? 'bg-white border border-gray-200 text-gray-800' : 'bg-green-600 text-white';
-    
-    if (msg.type === 'success') bubbleStyle = 'bg-green-100 border border-green-300 text-green-800';
-    if (msg.type === 'error') bubbleStyle = 'bg-red-50 border border-red-200 text-red-800';
-
-    return (
-      <div key={msg.id} className={`flex w-full my-2 ${isBot ? 'justify-start' : 'justify-end'}`}>
-        <div className={`max-w-[85%] rounded-2xl px-4 py-3 whitespace-pre-wrap ${bubbleStyle} shadow-sm`}>
-          {msg.type === 'success' && <CheckCircle2 className="inline-block mr-2 mb-1 w-5 h-5 text-green-600" />}
-          {msg.type === 'error' && <XCircle className="inline-block mr-2 mb-1 w-5 h-5 text-red-500" />}
-          <span style={/[أ-ي]/.test(msg.text) ? { direction: 'rtl', display: 'inline-block' } : {}}>{msg.text}</span>
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div className="flex flex-col h-screen bg-gray-50 font-sans">
-      {/* Header */}
-      <header className="bg-green-800 text-white p-4 shadow-md z-10 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-xl shadow-inner">
-            🇸🇦
-          </div>
-          <div>
-            <h1 className="font-bold text-lg">Saudi Greetings Bot</h1>
-            <p className="text-green-200 text-xs">Your personal language guide</p>
-          </div>
-        </div>
-      </header>
-
-      {/* Chat Area */}
-      <main className="flex-1 overflow-y-auto p-4 flex flex-col scroll-smooth">
-        <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-          .font-arabic { font-family: 'Cairo', sans-serif; }
-        `}</style>
         
-        {messages.map(renderMessage)}
         
-        {isRecording && (
-          <div className="flex justify-center my-4">
-             <div className="bg-red-100 text-red-600 px-4 py-2 rounded-full text-sm font-medium animate-pulse flex items-center gap-2 shadow-sm border border-red-200">
-               <Mic size={16} /> Listening to your microphone...
-             </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </main>
-
-      {/* Input Area (Only visible when writing mode is active) */}
-      {inputMode === 'writing' && (
-        <footer className="bg-white p-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] border-t border-gray-200">
-          <form onSubmit={handleTextSubmit} className="flex gap-2 max-w-2xl mx-auto">
-            <input
-              type="text"
-              dir="rtl"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="اكتب التحية هنا..."
-              className="flex-1 border-2 border-gray-300 rounded-full px-5 py-3 focus:outline-none focus:border-green-500 font-arabic text-right transition"
-              autoFocus
-            />
-            <button 
-              type="submit" 
-              disabled={!inputText.trim()}
-              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white p-3 rounded-full flex items-center justify-center transition transform hover:scale-105 disabled:hover:scale-100"
-            >
-              <Send size={20} />
-            </button>
-            <button 
-              type="button" 
-              onClick={() => setInputMode('none')}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2 rounded-full font-medium transition"
-            >
-              Cancel
-            </button>
-          </form>
-        </footer>
-      )}
-    </div>
-  );
-}
+        // ==========================================
+        // 3. تشغيل التطبيق (لا تحذف هذا الجزء)
+        // ==========================================
+        const root = createRoot(document.getElementById('root'));
+        // ملاحظة: إذا كان اسم الدالة الرئيسية لديك هو App، اترك السطر التالي كما هو
+        root.render(<App />);
+    </script>
+</body>
+</html>
